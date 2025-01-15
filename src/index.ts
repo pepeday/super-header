@@ -61,9 +61,25 @@ export default defineInterface({
 			name: 'Help',
 			type: 'text',
 			meta: {
-				width: 'full',
-				note: 'Add help information to guide users. Supports HTML.',
-				interface: 'input-rich-text-html',
+				width: 'half',
+				note: 'Add help information to guide users. Uses directus_translations collection. You can choose the display field by setting the Help Field',
+				interface: 'system-input-translated-string',
+			},
+		},
+		{
+			field: 'helpField',
+			name: 'Help Field',
+			type: 'string',
+			meta: {
+				width: 'half',
+				interface: 'system-field',
+				options: {
+					collectionName: 'directus_translations',
+					allowPrimaryKey: false,
+				},
+			},
+			schema: {
+				default_value: 'value',
 			},
 		},
 		{
