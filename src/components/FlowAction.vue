@@ -1,7 +1,25 @@
 <script setup lang="ts">
 import { useFlows } from '../composables/useFlows';
-
+import { inject, ref } from 'vue';
 import type { FlowIdentifier } from '../types';
+
+interface Props {
+	collection: string;
+	meta: {
+		flow?: string;
+	}
+	value: any;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+	collection: '',
+	meta: () => ({
+		flow: ''
+	})
+});
+
+const values = inject('values', ref<Record<string, any>>({}));
+
 
 interface FlowActionProps {
   label: string;
@@ -11,7 +29,6 @@ interface FlowActionProps {
   values: Record<string, any>;
 }
 
-const props = defineProps<FlowActionProps>();
 const emit = defineEmits(['flow-executed']);
 
 const { loading, runFlow } = useFlows();
@@ -25,15 +42,3 @@ const handleClick = async () => {
   }
 };
 </script>
-
-<template>
-  <v-button
-    :color="type"
-    small
-    :loading="loading"
-    @click="handleClick"
-  >
-    {{ label }}
-    <v-icon v-if="icon" :name="icon" right />
-  </v-button>
-</template>

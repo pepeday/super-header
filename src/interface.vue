@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, inject } from 'vue';
+import { ref, computed, inject, Component, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStores } from '@directus/extensions-sdk';
-import { render } from 'micromustache';
 
 import VText from './components/Text.vue';
 import LinkAction from './components/LinkAction.vue';
@@ -15,53 +14,85 @@ import type { SuperHeaderProps, Action, FlowIdentifier } from './types';
 const props = withDefaults(defineProps<SuperHeaderProps>(), {
 	actions: () => [],
 	help: '',
+	
 });
 
 const { t } = useI18n();
 const { useFieldsStore } = useStores();
 const fieldsStore = useFieldsStore();
 
-const { fetchFlows, showForm, submitFlow, currentFlow, runFlow } = useFlows();
+const { fetchFlows, showForm, submitFlow, currentFlow } = useFlows();
 
 const expanded = ref(false);
 const flowFormData = ref<Record<string, any>>({});
 
 const values = inject('values', ref<Record<string, any>>({}));
 
+const dynamicComponent = ref<Component | null>(null);
+const componentProps = ref<{ action: Action } | null>(null);
+const dynamicComponentRef = ref<{ triggerAction: () => void } | null>(null);
+
 const toggleHelp = () => {
 	expanded.value = !expanded.value;
 };
 
-const handleFlowExecuted = async ({ success, flow, result, error }) => {
-	if (success) {
-		console.log(`Flow ${flow.key} executed successfully`, result);
-	} else {
-		console.error(`Flow ${flow.key} execution failed:`, error);
-	}
-};
 
 const actionList = computed(() => {
-	console.log('props.actions', props.actions);
 	const formattedActions = props.actions.map((action) => {
-		if (action.actionType === 'link') {
-			return {
-				...action,
-				// Render the URL with item values in case it contains variables
-				url: render(action.url ?? '', values.value),
-			};
-		}
-		console.log('action', action);
-		return action;
+		
+		const { actionType, label, icon, type, ...otherProps } = action;
+		const formattedAction = {
+			actionType,
+			label,
+			icon,
+			type,
+			collection: props.collection,
+			meta: {
+				...otherProps,
+			}
+		};
+		return formattedAction;
 	});
-	console.log('formattedActions', formattedActions);
 	return formattedActions;
 });
 
+const emit = defineEmits(['action-clicked', 'action-triggered']);
 const handleActionClick = async (action: Action) => {
-	if (action.actionType === 'flow' && action.flow) {
-		runFlow(action.flow, props.values);
-	}
+    // Dynamically load the component for the action type
+    dynamicComponent.value = getComponentForAction(action.actionType);
+    
+    // Bind the action data
+    componentProps.value = {
+        ...action
+    };
+
+    // Wait for the next tick to ensure the component is mounted
+    await nextTick();
+    
+    // Call the child component's method
+    dynamicComponentRef.value?.triggerAction();
+    
+    // Emit the event
+    emit('action-triggered', action);
 };
+
+
+
+
+const getComponentForAction = (actionType: string) => {
+    switch (actionType) {
+        case 'link':
+            return LinkAction; // Return the actual component, not a string
+        case 'flow':
+            return FlowAction;
+        case 'create_anywhere':
+            return CreateAnywhere;
+        default:
+            console.warn(`Unknown action type: ${actionType}`);
+            return null;
+    }
+};
+
 
 const flowIdentifiers = () => {
 	if (!actionList.value || !actionList.value?.length) return [];
@@ -71,9 +102,7 @@ const flowIdentifiers = () => {
 		.map((action) => action.flow as FlowIdentifier);
 };
 
-if (flowIdentifiers().length) {
-	fetchFlows(flowIdentifiers());
-}
+
 
 const hasMultipleActions = computed(() => {
 	if (!actionList.value || !actionList.value?.length) return false;
@@ -100,47 +129,43 @@ const fields = computed(() => {
 						<render-template :collection="collection" :fields="fields" :item="values" :template="title" />
 					</p>
 					<p v-if="subtitle" class="subtitle">
-						<render-template :collection="collection" :fields="fields" :item="values" :template="subtitle" />
+						<render-template :collection="collection" :fields="fields" :item="values"
+							:template="subtitle" />
 					</p>
 				</div>
 			</div>
+
+
 			<div class="actions">
+				
+
+
 				<v-button v-if="help" secondary small @click="toggleHelp">
 					<v-icon name="help_outline" left />
 					{{ t('help') }}
 					<v-icon :name="expanded ? 'expand_less' : 'expand_more'" right />
 				</v-button>
+
 				<template v-if="!hasMultipleActions && primaryAction">
-					<LinkAction
-						v-if="primaryAction.actionType === 'link'"
-						:label="primaryAction.label"
-						:url="primaryAction.url || ''"
-						:icon="primaryAction.icon"
+					
+					<v-button
 						:type="primaryAction.type"
-					/>
-					<FlowAction
-						v-else-if="primaryAction.actionType === 'flow' && primaryAction.flow"
-						:label="primaryAction.label"
-						:flow="primaryAction.flow"
-						:icon="primaryAction.icon"
-						:type="primaryAction.type"
-						:values="values"
-						@flow-executed="handleFlowExecuted"
-					/>
-					<CreateAnywhere
-						v-if="primaryAction.actionType === 'create_anywhere'"
-						:label="primaryAction.label"
-						:icon="primaryAction.icon"
-						:type="primaryAction.type"
-						:collection="props.collection"
-						:primaryKey="props.primaryKey"
-						:value="values"
-						:selectedCollection="primaryAction.selectedCollection"
-						:defaultFields="primaryAction.defaultFields"
-					/>
+						small
+						@click="handleActionClick(primaryAction)"
+
+					>
+						{{ primaryAction.label }}
+						<v-icon v-if="primaryAction.icon" :name="primaryAction.icon" right />
+					</v-button>
+
 				</template>
 
-				<v-menu v-else-if="hasMultipleActions" placement="bottom-end">
+
+
+
+
+
+				<v-menu v-if="hasMultipleActions" placement="bottom-end">
 					<template #activator="{ toggle }">
 						<v-button small @click="toggle">
 							{{ t('actions') }}
@@ -148,27 +173,41 @@ const fields = computed(() => {
 						</v-button>
 					</template>
 
+
+
 					<v-list>
+
 						<v-list-item
 							v-for="(action, index) in actionList"
 							:key="index"
 							clickable
-							@click="action.actionType === 'link' ? null : handleActionClick(action)"
+							@click="handleActionClick(action)"
 						>
-							<v-list-item-icon v-if="action.icon"><v-icon :name="action.icon" /></v-list-item-icon>
+							<v-list-item-icon v-if="action.icon">
+								<v-icon :name="action.icon" />
+							</v-list-item-icon>
 							<v-list-item-content>
 								<v-list-item-title>
-									<template v-if="action.actionType === 'link'">
-										<a :href="action.url" target="_blank">{{ t(action.label) }}</a>
-									</template>
-									<template v-else>
-										{{ t(action.label) }}
-									</template>
+
+										{{ action.label }}
+
 								</v-list-item-title>
 							</v-list-item-content>
 						</v-list-item>
+
+
 					</v-list>
 				</v-menu>
+
+				<component
+				v-if="dynamicComponent"
+				ref="dynamicComponentRef"
+				v-bind="componentProps"
+				:is="dynamicComponent"
+				>
+				</component>
+
+
 			</div>
 		</div>
 		<transition-expand>
@@ -183,21 +222,20 @@ const fields = computed(() => {
 		<v-card>
 			<v-card-title>{{ currentFlow?.name || 'Run Flow' }}</v-card-title>
 			<v-card-text>
-				<v-form v-if="currentFlow?.options?.fields" v-model="flowFormData" :fields="currentFlow.options.fields" />
+				<v-form v-if="currentFlow?.options?.fields" v-model="flowFormData"
+					:fields="currentFlow.options.fields" />
 			</v-card-text>
 			<v-card-actions>
 				<v-button secondary @click="showForm = false">
 					{{ t('cancel') }}
 				</v-button>
-				<v-button
-					@click="
-						submitFlow({
-							collection: currentFlow.collection,
-							key: currentFlow.key,
-							...flowFormData,
-						})
-					"
-				>
+				<v-button @click="
+					submitFlow({
+						collection: currentFlow.collection,
+						key: currentFlow.key,
+						...flowFormData,
+					})
+					">
 					{{ t('run_flow') }}
 				</v-button>
 			</v-card-actions>
@@ -227,6 +265,7 @@ const fields = computed(() => {
 
 .text-content {
 	display: flex;
+
 	.v-icon {
 		margin-right: 4px;
 		transform: translateY(-1px);

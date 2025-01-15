@@ -9,15 +9,17 @@ export interface DefaultField {
 }
 
 export interface Action {
-	label: string;
-	icon?: string;
-	type?: string;
-	actionType: 'link' | 'flow' | 'create_anywhere';
-	url?: string;
-	flow?: FlowIdentifier;
-	// Properties for create_anywhere
-	selectedCollection?: string;
-	defaultFields?: DefaultField[];
+    actionType: string; // The type of action (e.g., 'link', 'flow', 'create_anywhere')
+    meta?: Record<string, any>; // Additional data or configuration for the action
+    label?: string; // The label to display for the action
+    icon?: string; // An optional icon for the action
+    type?: string; // Optional button or UI styling type
+	collection?: string;
+}
+
+export interface ActionComponent {
+    action: Action; // The action object
+    onActionTriggered?: (action: Action) => void; // Optional callback for additional handling
 }
 
 export interface SuperHeaderProps {
@@ -31,3 +33,4 @@ export interface SuperHeaderProps {
 	collection: string;
 	primaryKey: string;
 }
+

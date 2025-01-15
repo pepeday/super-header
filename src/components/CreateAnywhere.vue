@@ -1,22 +1,5 @@
-<template>
-
-	<v-button 
-		:color="type"	
-		small
-		:loading="loading"
-		@click="handleClick"
-		>
-		{{ label }}
-		<v-icon v-if="icon" :name="icon" right />
-	</v-button>
-
-	<drawer-item v-model:active="showDrawer" :collection="selectedCollection" :primary-key="'+'" :edits="defaultEdits"
-		@input="handleDrawerSave" persistent />
-
-</template>
-
 <script setup lang="ts">
-import { ref, inject, watch } from 'vue';
+import { ref, inject, watch, onMounted } from 'vue';
 import { useStores, useApi } from '@directus/composables';
 import resolveMustacheString from '../composables/resolveMustacheString';
 
@@ -24,22 +7,19 @@ import resolveMustacheString from '../composables/resolveMustacheString';
 
 interface Props {
 	collection: string;
-	primaryKey?: string | number;
+	meta: {
+		defaultFields?: Array<{ field: string; value: string }>;
+		selectedCollection?: string;
+	}
 	value: any;
-	selectedCollection?: string;
-	defaultFields?: Array<{ field: string; value: string }>;
-	icon?: string;
-	type?: string;
-	label?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-	primaryKey: undefined,
-	icon: 'content_copy',
-	color: 'primary',
-	defaultFields: () => [],
-	selectedCollection: '',
-	label: 'Create Anywhere',
+	collection: '',
+	meta: {
+		defaultFields: () => [],
+		selectedCollection: ''
+	}
 });
 
 
@@ -51,6 +31,7 @@ const api = useApi();
 
 // State
 const showDrawer = ref(false);
+const isReady = ref(false);
 
 // Rename to be more explicit about what values these are
 const currentItemValues = inject('values', ref<Record<string, any>>({}));
@@ -74,38 +55,49 @@ const resolveTemplateValues = async (templates: string[]) => {
 // Update defaultEdits to handle async template resolution
 const defaultEdits = ref<Record<string, any>>({});
 
-// Watch for changes in props.defaultFields and update defaultEdits
-watch([() => props.defaultFields, currentItemValues], async () => {
-	if (!props.defaultFields?.length) {
+const initializeDefaultEdits = async () => {
+	if (!props.meta.defaultFields?.length) {
 		defaultEdits.value = {};
+		isReady.value = true;
 		return;
 	}
 
-	const templates = props.defaultFields.map(field => field.value);
+	const templates = props.meta.defaultFields.map(field => field.value);
 	const resolvedValues = await resolveTemplateValues(templates);
-
+	
 	const edits: Record<string, any> = {};
-	props.defaultFields.forEach((fieldConfig, index) => {
+	props.meta.defaultFields.forEach((fieldConfig, index) => {
 		edits[fieldConfig.field] = resolvedValues[index];
 	});
-
+	
 	defaultEdits.value = edits;
-}, { immediate: true });
+	isReady.value = true;
+};
+
+// Initialize on mount
+onMounted(initializeDefaultEdits);
+
+// Watch for changes in dependencies
+watch([() => props.meta.defaultFields, currentItemValues], initializeDefaultEdits);
 
 // Methods
-const handleClick = () => {
+const triggerAction = async () => {
+	if (!isReady.value) {
+		await initializeDefaultEdits();
+	}
 	showDrawer.value = true;
 };
 
-const handleDrawerSave = async (newEdits: Record<string, any>) => {
 
+defineExpose({ triggerAction });
+
+
+const handleDrawerSave = async (newEdits: Record<string, any>) => {
 	try {
-		// Use selectedCollection instead of collection for the API call
-		const response = await api.post(`/items/${props.selectedCollection}`, {
+		await api.post(`/items/${props.meta.selectedCollection}`, {
 			...defaultEdits.value,
 			...newEdits,
 		});
-
 
 		showDrawer.value = false;
 
@@ -114,6 +106,7 @@ const handleDrawerSave = async (newEdits: Record<string, any>) => {
 			type: 'success',
 		});
 	} catch (error) {
+		console.error('Error in handleDrawerSave:', error);
 		notificationsStore.add({
 			title: 'Error',
 			type: 'error',
@@ -125,9 +118,9 @@ const handleDrawerSave = async (newEdits: Record<string, any>) => {
 
 </script>
 
-<style lang="scss" scoped>
-.create-anywhere {
-	display: flex;
-	justify-content: flex-end;
-}
-</style>
+<template>
+
+	<drawer-item v-model:active="showDrawer" :collection="props.meta.selectedCollection" :primary-key="'+'" :edits="defaultEdits"
+		@input="handleDrawerSave" persistent />
+
+</template>
