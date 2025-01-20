@@ -17,24 +17,21 @@ const props = withDefaults(defineProps<SuperHeaderProps>(), {
 	
 });
 
-// Get the raw translation key from props.help
-const rawHelp = computed(() => {
-	const value = props.helpKey;
-	if (!value) return '';  // Return empty string if no value
-	return value.startsWith('$t:') ? value.substring(3) : value;
-});
 
 const { t } = useI18n();
 const { useFieldsStore } = useStores();
 const fieldsStore = useFieldsStore();
 const values = inject('values', ref<Record<string, any>>({}));
 
+
 // Create refs for the translation parameters
-const translationKey = ref(rawHelp.value);
+const translationKey = ref(props.helpKey);
 const translationField = ref(props.helpField);
 
+
+
 // Watch for changes in the computed value
-watch(rawHelp, (newValue) => {
+watch(() => props.helpKey, (newValue) => {
 	translationKey.value = newValue;
 });
 
@@ -43,7 +40,9 @@ watch(() => props.helpField, (newValue) => {
 });
 
 // Use the refs in useTranslation
-const { translation, loading } = useTranslation(rawHelp.value, props.helpField);
+const { translation, loading } = useTranslation(props.helpKey, props.helpField);
+
+
 
 const expanded = ref(false);
 const flowFormData = ref<Record<string, any>>({});
@@ -146,12 +145,11 @@ const fields = computed(() => {
 			<div class="text-content">
 				<v-icon v-if="icon" :name="icon" />
 				<div>
-					<p class="title">
+					<p v-if="title" class="title">
 						<render-template :collection="collection" :fields="fields" :item="values" :template="title" />
 					</p>
 					<p v-if="subtitle" class="subtitle">
-						<render-template :collection="collection" :fields="fields" :item="values"
-							:template="subtitle" />
+						<render-template :collection="collection" :fields="fields" :item="values" :template="subtitle" />
 					</p>
 				</div>
 			</div>
@@ -275,13 +273,13 @@ const fields = computed(() => {
 .actions {
 	display: flex;
 	gap: 8px;
-	align-items: center;
+	align-items: flex-start;
 }
 
 .header-content {
 	display: flex;
 	justify-content: space-between;
-	align-items: center;
+	align-items: flex-start;
 	padding-bottom: 8px;
 	border-bottom: var(--theme--border-width) solid var(--theme--border-color);
 	color: var(--header-color, var(--theme--foreground));
@@ -309,11 +307,6 @@ const fields = computed(() => {
 	font-size: 14px;
 	color: var(--theme--foreground-subdued);
 	margin-top: 4px;
-}
-
-.actions {
-	display: flex;
-	gap: 8px;
 }
 
 .help-text {
