@@ -24,24 +24,8 @@ const fieldsStore = useFieldsStore();
 const values = inject('values', ref<Record<string, any>>({}));
 
 
-// Create refs for the translation parameters
-const translationKey = ref(props.helpKey);
-const translationField = ref(props.helpField);
-
-
-
-// Watch for changes in the computed value
-watch(() => props.helpKey, (newValue) => {
-	translationKey.value = newValue;
-});
-
-watch(() => props.helpField, (newValue) => {
-	translationField.value = newValue;
-});
-
 // Use the refs in useTranslation
 const { translation, loading } = useTranslation(props.helpKey, props.helpField);
-
 
 
 const expanded = ref(false);

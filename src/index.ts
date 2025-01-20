@@ -81,9 +81,6 @@ export default defineInterface({
 					allowPrimaryKey: false,
 				},
 			},
-			schema: {
-				default_value: 'value',
-			},
 		},
 		{
 			field: 'actionButton',
