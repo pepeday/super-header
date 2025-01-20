@@ -1,32 +1,52 @@
 <script setup lang="ts">
-import { ref, computed, inject, Component, nextTick } from 'vue';
+import { ref, computed, inject, Component, nextTick, watch, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStores } from '@directus/extensions-sdk';
 
-import VText from './components/Text.vue';
 import LinkAction from './components/LinkAction.vue';
 import FlowAction from './components/FlowAction.vue';
 import CreateAnywhere from './components/CreateAnywhere.vue';
 
-import { useFlows } from './composables/useFlows';
 import type { SuperHeaderProps, Action, FlowIdentifier } from './types';
+import { useTranslation } from './composables/getTranslation';
 
 const props = withDefaults(defineProps<SuperHeaderProps>(), {
 	actions: () => [],
-	help: '',
+	helpKey: '',
+	helpField: '',
 	
+});
+
+// Get the raw translation key from props.help
+const rawHelp = computed(() => {
+	const value = props.helpKey;
+	if (!value) return '';  // Return empty string if no value
+	return value.startsWith('$t:') ? value.substring(3) : value;
 });
 
 const { t } = useI18n();
 const { useFieldsStore } = useStores();
 const fieldsStore = useFieldsStore();
+const values = inject('values', ref<Record<string, any>>({}));
 
-const { fetchFlows, showForm, submitFlow, currentFlow } = useFlows();
+// Create refs for the translation parameters
+const translationKey = ref(rawHelp.value);
+const translationField = ref(props.helpField);
+
+// Watch for changes in the computed value
+watch(rawHelp, (newValue) => {
+	translationKey.value = newValue;
+});
+
+watch(() => props.helpField, (newValue) => {
+	translationField.value = newValue;
+});
+
+// Use the refs in useTranslation
+const { translation, loading } = useTranslation(rawHelp.value, props.helpField);
 
 const expanded = ref(false);
 const flowFormData = ref<Record<string, any>>({});
-
-const values = inject('values', ref<Record<string, any>>({}));
 
 const dynamicComponent = ref<Component | null>(null);
 const componentProps = ref<{ action: Action } | null>(null);
@@ -117,6 +137,7 @@ const primaryAction = computed(() => {
 const fields = computed(() => {
 	return fieldsStore.getFieldsForCollection(props.collection);
 });
+
 </script>
 
 <template>
@@ -140,7 +161,12 @@ const fields = computed(() => {
 				
 
 
-				<v-button v-if="help" secondary small @click="toggleHelp">
+				<v-button 
+					v-if="helpKey && translation" 
+					secondary 
+					small 
+					@click="toggleHelp"
+				>
 					<v-icon name="help_outline" left />
 					{{ t('help') }}
 					<v-icon :name="expanded ? 'expand_less' : 'expand_more'" right />
@@ -168,7 +194,7 @@ const fields = computed(() => {
 				<v-menu v-if="hasMultipleActions" placement="bottom-end">
 					<template #activator="{ toggle }">
 						<v-button small @click="toggle">
-							{{ t('actions') }}
+							{{ props.actionButton }}
 							<v-icon name="expand_more" right />
 						</v-button>
 					</template>
@@ -211,8 +237,10 @@ const fields = computed(() => {
 			</div>
 		</div>
 		<transition-expand>
-			<div v-if="expanded && help" class="help-text">
-				<v-text :content="help" />
+			<!-- Debug info -->
+			<div v-if="expanded && translation" class="help-text">
+				<div v-if="loading">Loading...</div>
+				<div v-else-if="translation" v-html="translation"></div>
 			</div>
 		</transition-expand>
 	</div>
@@ -291,5 +319,11 @@ const fields = computed(() => {
 .help-text {
 	padding-block: 16px;
 	border-bottom: var(--theme--border-width) solid var(--theme--border-color);
+
+	:deep(img) {
+		border-radius: 8px;
+		max-height: 250px;
+		object-fit: cover;
+	}
 }
 </style>

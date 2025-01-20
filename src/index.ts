@@ -1,10 +1,10 @@
 import { defineInterface } from '@directus/extensions-sdk';
-import InterfaceComponent from './interface.vue';
+import InterfaceComponent from './superHeader.vue';
 
 export default defineInterface({
 	id: 'super-header',
 	name: 'Super Header',
-	icon: 'exercise',
+	icon: 'page_header',
 	description:
 		'Create a header with a title, subtitle, help information, and/or actions to help users navigate or run Flows.',
 	component: InterfaceComponent,
@@ -57,21 +57,24 @@ export default defineInterface({
 			},
 		},
 		{
-			field: 'help',
-			name: 'Help',
-			type: 'text',
+			field: 'helpKey',
+			name: 'Help translation key',
+			type: 'string',
 			meta: {
-				width: 'half',
+				width: 'full',
 				note: 'Add help information to guide users. Uses directus_translations collection. You can choose the display field by setting the Help Field',
-				interface: 'system-input-translated-string',
-			},
+				interface: 'input',
+				options: {
+					placeholder: 'Enter translation key (e.g., help_inspections)',
+				}
+			}
 		},
 		{
 			field: 'helpField',
 			name: 'Help Field',
 			type: 'string',
 			meta: {
-				width: 'half',
+				width: 'full',
 				interface: 'system-field',
 				options: {
 					collectionName: 'directus_translations',
@@ -82,6 +85,19 @@ export default defineInterface({
 				default_value: 'value',
 			},
 		},
+		{
+			field: 'actionButton',
+			name: 'Action button label',
+			type: 'string',
+			meta: {
+				width: 'full',
+				interface: 'system-input-translated-string',
+				options: {
+					placeholder: 'Label for the button',
+				}
+			}
+		},
+
 		{
 			field: 'actions',
 			name: 'Actions',

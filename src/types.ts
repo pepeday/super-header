@@ -27,10 +27,12 @@ export interface SuperHeaderProps {
 	title?: string;
 	subtitle?: string;
 	actions?: Action[];
-	help?: string;
+	helpKey?: string;
 	values: Record<string, any>;
 	color?: string;
 	collection: string;
 	primaryKey: string;
+	helpField?: string;
+	actionButton?: string;
 }
 
