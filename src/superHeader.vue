@@ -299,7 +299,8 @@ const fields = computed(() => {
 
 	:deep(img) {
 		border-radius: 8px;
-		max-height: 250px;
+		max-height: 350px;
+		max-width: 350px;
 		object-fit: cover;
 	}
 }
