@@ -265,7 +265,6 @@ const fields = computed(() => {
 	justify-content: space-between;
 	align-items: flex-start;
 	padding-bottom: 8px;
-	border-bottom: var(--theme--border-width) solid var(--theme--border-color);
 	color: var(--header-color, var(--theme--foreground));
 }
 
@@ -295,12 +294,11 @@ const fields = computed(() => {
 
 .help-text {
 	padding-block: 16px;
-	border-bottom: var(--theme--border-width) solid var(--theme--border-color);
 
 	:deep(img) {
 		border-radius: 8px;
-		max-height: 350px;
-		max-width: 350px;
+		max-height: 100%;
+		max-width: 100%;
 		object-fit: cover;
 	}
 }
