@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, inject, Component, nextTick, watch, watchEffect } from 'vue';
+import { ref, computed, inject, Component, nextTick, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useStores } from '@directus/extensions-sdk';
+import { useStores, useApi } from '@directus/extensions-sdk';
 
 import LinkAction from './components/LinkAction.vue';
 import FlowAction from './components/FlowAction.vue';
 import CreateAnywhere from './components/CreateAnywhere.vue';
+import SwitchBU from './components/SwitchBU.vue';
 
 import type { SuperHeaderProps, Action, FlowIdentifier } from './types';
 import { useTranslation } from './composables/getTranslation';
@@ -17,15 +18,36 @@ const props = withDefaults(defineProps<SuperHeaderProps>(), {
 	
 });
 
+const api = useApi();
+const currentBusinessUnitName = ref('');
+
+const fetchCurrentBusinessUnit = async () => {
+  try {
+    const response = await api.get('/users/me', {
+      params: {
+        fields: ['business_unit_owner_id.name','business_unit_owner_id.organization_id.name']
+      }
+    });
+    
+	currentBusinessUnitName.value = response.data.data.business_unit_owner_id.name;
+
+  } catch (error) {
+    console.error('Error fetching business unit:', error);
+  }
+};
+
+onMounted(async () => {
+  await fetchCurrentBusinessUnit();
+});
 
 const { t } = useI18n();
 const { useFieldsStore } = useStores();
 const fieldsStore = useFieldsStore();
 const values = inject('values', ref<Record<string, any>>({}));
 
-
 // Use the refs in useTranslation
 const { translation, loading } = useTranslation(props.helpKey, props.helpField);
+
 
 
 const expanded = ref(false);
@@ -90,6 +112,8 @@ const getComponentForAction = (actionType: string) => {
             return FlowAction;
         case 'create_anywhere':
             return CreateAnywhere;
+        case 'switch_bu':
+            return SwitchBU;
         default:
             console.warn(`Unknown action type: ${actionType}`);
             return null;
@@ -120,6 +144,18 @@ const primaryAction = computed(() => {
 const fields = computed(() => {
 	return fieldsStore.getFieldsForCollection(props.collection);
 });
+
+const handleSwitchBU = async () => {
+    dynamicComponent.value = SwitchBU;
+    componentProps.value = {
+        collection: props.collection
+    };
+    
+    await nextTick();
+    dynamicComponentRef.value?.triggerAction();
+
+	
+};
 
 </script>
 
@@ -152,6 +188,14 @@ const fields = computed(() => {
 					<v-icon name="help_outline" left />
 					{{ t('help') }}
 					<v-icon :name="expanded ? 'expand_less' : 'expand_more'" right />
+				</v-button>
+
+				<v-button 
+					small 
+					@click="handleSwitchBU"
+				>
+					<v-icon name="swap_horiz" left />
+					{{currentBusinessUnitName}}
 				</v-button>
 
 				<template v-if="!hasMultipleActions && primaryAction">
