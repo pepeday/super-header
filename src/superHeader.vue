@@ -182,19 +182,18 @@ const handleSwitchBU = async () => {
 				<v-button 
 					v-if="helpKey && translation" 
 					secondary 
-					small 
+					small
+					icon
 					@click="toggleHelp"
 				>
-					<v-icon name="help_outline" left />
-					{{ t('help') }}
-					<v-icon :name="expanded ? 'expand_less' : 'expand_more'" right />
+					<v-icon :name="expanded ? 'help_outline' : 'expand_more'" />
 				</v-button>
 
 				<v-button 
 					small 
 					@click="handleSwitchBU"
 				>
-					<v-icon name="swap_horiz" left />
+					<v-icon name="swap_horiz" right />
 					{{currentBusinessUnitName}}
 				</v-button>
 
