@@ -186,15 +186,15 @@ const handleSwitchBU = async () => {
 					icon
 					@click="toggleHelp"
 				>
-					<v-icon :name="expanded ? 'help_outline' : 'expand_more'" />
+					<v-icon :name="expanded ? 'expand_less' : 'help_outline'" />
 				</v-button>
 
 				<v-button 
 					small 
 					@click="handleSwitchBU"
 				>
-					<v-icon name="swap_horiz" right />
 					{{currentBusinessUnitName}}
+					<v-icon name="swap_horiz" right />
 				</v-button>
 
 				<template v-if="!hasMultipleActions && primaryAction">
