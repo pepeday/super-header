@@ -9,63 +9,18 @@ export default defineInterface({
 		'Create a header with a title, subtitle, help information, and/or actions to help users navigate or run Flows.',
 	component: InterfaceComponent,
 	options: (context) => [
-		{
-			field: 'title',
-			name: 'Title',
-			type: 'string',
-			meta: {
-				width: 'full',
-				interface: 'system-display-template',
-				options: {
-					collectionName: context.collection,
-				},
-				note: 'Enter a title, or leave it blank to only show a line. You can also include fields from the current item. NOTE: this interface ONLY supports root level fields, it does NOT support showing relational fields.',
-			},
-		},
-		{
-			field: 'color',
-			name: 'Color',
-			type: 'string',
-			meta: {
-				width: 'half',
-				interface: 'select-color',
-				note: 'Select a color for the title and icon.',
-				options: {},
-			},
-		},
-		{
-			field: 'icon',
-			name: 'Icon',
-			type: 'string',
-			meta: {
-				width: 'half',
-				interface: 'select-icon',
-				note: 'Select an icon to display next to the title.',
-			},
-		},
-		{
-			field: 'subtitle',
-			name: 'Subtitle',
-			type: 'string',
-			meta: {
-				width: 'full',
-				interface: 'system-display-template',
-				options: {
-					collectionName: context.collection,
-				},
-				note: 'Enter a subtitle for additional context. You can also include fields from the current item. NOTE: this interface ONLY supports root level fields, it does NOT support showing relational fields.',
-			},
-		},
+
 		{
 			field: 'helpKey',
 			name: 'Help translation key',
 			type: 'string',
 			meta: {
 				width: 'full',
-				note: 'Add help information to guide users. Uses directus_translations collection. You can choose the display field by setting the Help Field',
 				interface: 'input',
+				note: 'Enter the translation key (e.g., help_inspections)',
 				options: {
-					placeholder: 'Enter translation key (e.g., help_inspections)',
+					placeholder: 'help_key',
+					font: 'monospace'  // Makes it clearer it's a key
 				}
 			}
 		},

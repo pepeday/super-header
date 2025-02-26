@@ -18,6 +18,8 @@ const props = withDefaults(defineProps<SuperHeaderProps>(), {
 	
 });
 
+console.log('🔍 Super Header Props:', props);
+
 const api = useApi();
 const currentBusinessUnitName = ref('');
 
@@ -41,14 +43,21 @@ onMounted(async () => {
 });
 
 const { t } = useI18n();
-const { useFieldsStore } = useStores();
+const { useFieldsStore, useNotificationsStore } = useStores();
 const fieldsStore = useFieldsStore();
+const notificationsStore = useNotificationsStore();
 const values = inject('values', ref<Record<string, any>>({}));
 
 // Use the refs in useTranslation
 const { translation, loading } = useTranslation(props.helpKey, props.helpField);
 
-
+// Add debug logs
+console.log('🔍 Super Header Debug:', {
+  helpKey: props.helpKey,
+  helpField: props.helpField,
+  translation: translation.value,
+  loading: loading.value
+});
 
 const expanded = ref(false);
 const flowFormData = ref<Record<string, any>>({});
@@ -157,28 +166,21 @@ const handleSwitchBU = async () => {
 	
 };
 
+const copyCurrentUrl = () => {
+    navigator.clipboard.writeText(window.location.href);
+    notificationsStore.add({
+        title: t('Copied to clipboard'),
+        icon: 'content_copy',
+        type: 'success'
+    });
+};
+
 </script>
 
 <template>
 	<div class="page-header">
 		<div class="header-content" :style="{ '--header-color': color }">
-			<div class="text-content">
-				<v-icon v-if="icon" :name="icon" />
-				<div>
-					<p v-if="title" class="title">
-						<render-template :collection="collection" :fields="fields" :item="values" :template="title" />
-					</p>
-					<p v-if="subtitle" class="subtitle">
-						<render-template :collection="collection" :fields="fields" :item="values" :template="subtitle" />
-					</p>
-				</div>
-			</div>
-
-
-			<div class="actions">
-				
-
-
+			<div class="global-actions">
 				<v-button 
 					v-if="helpKey && translation" 
 					secondary 
@@ -189,8 +191,23 @@ const handleSwitchBU = async () => {
 					<v-icon :name="expanded ? 'expand_less' : 'help_outline'" />
 				</v-button>
 
+				<v-button
+					secondary
+					small
+					icon
+					@click="copyCurrentUrl"
+				>
+					<v-icon name="content_copy" />
+				</v-button>
+			</div>
+
+			<div class="actions">
+				
+
+
 				<v-button 
-					small 
+					small
+					secondary 
 					@click="handleSwitchBU"
 				>
 					{{currentBusinessUnitName}}
@@ -315,24 +332,14 @@ const handleSwitchBU = async () => {
 	--v-icon-color: var(--header-color);
 }
 
-.text-content {
+.global-actions {
 	display: flex;
+	gap: 8px;
+	align-items: center;
 
 	.v-icon {
-		margin-right: 4px;
-		transform: translateY(-1px);
+		--v-icon-color: var(--header-color);
 	}
-}
-
-.title {
-	font-size: 20px;
-	font-weight: 600;
-}
-
-.subtitle {
-	font-size: 14px;
-	color: var(--theme--foreground-subdued);
-	margin-top: 4px;
 }
 
 .help-text {

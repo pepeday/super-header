@@ -1,59 +1,42 @@
 import { useApi } from '@directus/extensions-sdk';
-import { ref, watch, watchEffect } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { ref, watch } from 'vue';
 
-interface Translation {
-    id: string;
-    key: string;
-    language: string;
-    [key: string]: any;  // For custom fields like 'html'
-}
-
-export function useTranslation(keyRef: string, fieldRef: string = 'value') {
-    const api = useApi();
-    const { locale } = useI18n();
+export function useTranslation(helpKey: string, helpField: string) {
     const translation = ref<string | null>(null);
-    const loading = ref(false);
-    const error = ref<Error | null>(null);
+    const loading = ref(true);
+    const api = useApi();
 
     const fetchTranslation = async () => {
-        if (!keyRef || keyRef === '') {
+        if (!helpKey || !helpField) {
             translation.value = null;
+            loading.value = false;
             return;
         }
-        
-        const translationKey = keyRef.startsWith('$t:') ? keyRef.substring(3) : keyRef;
-        
-        loading.value = true;
-        error.value = null;
 
         try {
-            const response = await api.get<{ data: Translation[] }>(
-                '/translations', {
-                    params: {
-                        'filter[key][_eq]': translationKey,
-                        'filter[language][_eq]': locale.value,
-                        fields: ['key', fieldRef],
-                        limit: 1
-                    }
+            const response = await api.get('/translations', {
+                params: {
+                    filter: {
+                        key: {
+                            _eq: helpKey
+                        }
+                    },
+                    fields: [`${helpField}`]
                 }
-            );
-            
-            const translationItem = response.data?.data?.[0];
-            if (translationItem && fieldRef in translationItem) {
-                translation.value = translationItem[fieldRef];
+            });
+
+            if (response.data.data && response.data.data.length > 0) {
+                translation.value = response.data.data[0][helpField];
             }
-        } catch (err) {
-            error.value = err as Error;
+        } catch (error) {
+            console.error('Error fetching translation:', error);
             translation.value = null;
         } finally {
             loading.value = false;
         }
     };
 
-    watchEffect(() => {
-        fetchTranslation();
-    });
+    watch([() => helpKey, () => helpField], fetchTranslation, { immediate: true });
 
-    return { translation, loading, error, refresh: fetchTranslation };
+    return { translation, loading };
 }
