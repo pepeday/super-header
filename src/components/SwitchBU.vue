@@ -58,49 +58,53 @@ const fetchBusinessUnits = async () => {
     });
 
     const data = response.data.data;
-    currentBusinessUnit.value = data.business_unit_owner_id.name;
     
-    // Store current values
-    const currentOrgId = data.business_unit_owner_id.organization_id.id;
-    const currentBUId = data.business_unit_owner_id.id;
-    
-    // Create organizations and business units maps
-    const orgsMap = new Map<string, Organization>();
-    const busMap = new Map<string, BusinessUnit[]>();
+    // Ensure we have the required data before proceeding
+    if (!data?.business_unit_owner_id) {
+      console.warn('Missing business unit data:', JSON.stringify(data, null, 2));
+      return;
+    }
 
-    data.business_units_available.forEach((item: any) => {
-      const bu = item.business_units_id;
-      const org = bu.organization_id;
+    // Set all reactive properties within a single tick
+    await nextTick(() => {
+      currentBusinessUnit.value = data.business_unit_owner_id.name;
+      const currentOrgId = data.business_unit_owner_id.organization_id.id;
+      const currentBUId = data.business_unit_owner_id.id;
+      
+      // Create maps
+      const orgsMap = new Map<string, Organization>();
+      const busMap = new Map<string, BusinessUnit[]>();
 
-      if (!orgsMap.has(org.id)) {
-        orgsMap.set(org.id, {
-          id: org.id,
-          name: org.name
+      // Filter out null values and map the data
+      data.business_units_available
+        .filter((item: any) => item.business_units_id !== null)
+        .forEach((item: any) => {
+          const bu = item.business_units_id;
+          const org = bu.organization_id;
+
+          if (!orgsMap.has(org.id)) {
+            orgsMap.set(org.id, {
+              id: org.id,
+              name: org.name
+            });
+            busMap.set(org.id, []);
+          }
+
+          busMap.get(org.id)?.push({
+            id: bu.id,
+            name: bu.name,
+            organization_id: org.id
+          });
         });
-        busMap.set(org.id, []);
-      }
 
-      busMap.get(org.id)?.push({
-        id: bu.id,
-        name: bu.name,
-        organization_id: org.id
-      });
+      organizations.value = Array.from(orgsMap.values());
+      businessUnitsMap.value = busMap;
+      selectedOrganizationId.value = currentOrgId;
+      selectedBusinessUnitId.value = currentBUId;
     });
 
-    organizations.value = Array.from(orgsMap.values());
-    businessUnitsMap.value = busMap;
-
-    // Set organization first
-    selectedOrganizationId.value = currentOrgId;
-    
-    // Use nextTick to ensure the filteredBusinessUnits computed property updates
-    await nextTick();
-    
-    // Then set business unit
-    selectedBusinessUnitId.value = currentBUId;
-
   } catch (error) {
-    console.error('Error fetching business units:', error);
+    console.error('Error fetching business units:', JSON.stringify(error, null, 2));
   } finally {
     isLoading.value = false;
   }
@@ -111,8 +115,12 @@ const handleSave = async () => {
 
   try {
     isLoading.value = true;
+    
+    // Update both the business_unit_owner_id and business_units_write
     await api.patch('/users/me', {
-      business_unit_owner_id: selectedBusinessUnitId.value
+      business_unit_owner_id: selectedBusinessUnitId.value,
+      // Set business_units_write to only contain the selected business unit
+      business_units_write: [selectedBusinessUnitId.value]
     });
 
     // Call the callback if provided
@@ -151,6 +159,12 @@ const handleSave = async () => {
 
 // Method that will be called from the parent
 const triggerAction = async () => {
+  // Reset state before showing dialog
+  selectedOrganizationId.value = null;
+  selectedBusinessUnitId.value = null;
+  organizations.value = [];
+  businessUnitsMap.value = new Map();
+  
   showDialog.value = true;
   await fetchBusinessUnits();
 };
