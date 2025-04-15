@@ -18,7 +18,6 @@ const props = withDefaults(defineProps<SuperHeaderProps>(), {
 	
 });
 
-console.log('🔍 Super Header Props:', props);
 
 const api = useApi();
 const currentBusinessUnitName = ref('');
@@ -51,13 +50,6 @@ const values = inject('values', ref<Record<string, any>>({}));
 // Use the refs in useTranslation
 const { translation, loading } = useTranslation(props.helpKey, props.helpField);
 
-// Add debug logs
-console.log('🔍 Super Header Debug:', {
-  helpKey: props.helpKey,
-  helpField: props.helpField,
-  translation: translation.value,
-  loading: loading.value
-});
 
 const expanded = ref(false);
 const flowFormData = ref<Record<string, any>>({});
