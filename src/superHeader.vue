@@ -20,25 +20,29 @@ const props = withDefaults(defineProps<SuperHeaderProps>(), {
 
 
 const api = useApi();
-const currentBusinessUnitName = ref('');
+const currentTeam = ref('');
 
-const fetchCurrentBusinessUnit = async () => {
+const fetchCurrentTeam = async () => {
   try {
     const response = await api.get('/users/me', {
       params: {
-        fields: ['business_unit_owner_id.name','business_unit_owner_id.organization_id.name']
+        fields: [
+          'team.name',
+		  'team.id'
+        ]
       }
     });
     
-	currentBusinessUnitName.value = response.data.data.business_unit_owner_id.name;
+    const team = response.data.data.team;
+    currentTeam.value = team.name;
 
   } catch (error) {
-    console.error('Error fetching business unit:', error);
+    console.error('Error fetching team:', JSON.stringify(error, null, 2));
   }
 };
 
 onMounted(async () => {
-  await fetchCurrentBusinessUnit();
+  await fetchCurrentTeam();
 });
 
 const { t } = useI18n();
@@ -146,7 +150,7 @@ const fields = computed(() => {
 	return fieldsStore.getFieldsForCollection(props.collection);
 });
 
-const handleSwitchBU = async () => {
+const handleSwitchTeam = async () => {
     dynamicComponent.value = SwitchBU;
     componentProps.value = {
         collection: props.collection
@@ -200,9 +204,9 @@ const copyCurrentUrl = () => {
 				<v-button 
 					small
 					secondary 
-					@click="handleSwitchBU"
+					@click="handleSwitchTeam"
 				>
-					{{currentBusinessUnitName}}
+					{{currentTeam}}
 					<v-icon name="swap_horiz" right />
 				</v-button>
 

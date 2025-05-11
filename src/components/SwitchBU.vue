@@ -2,6 +2,8 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import { useI18n } from 'vue-i18n';
+import { useFlows } from '../composables/useFlows';
+
 
 interface Props {
   collection: string;
@@ -13,12 +15,15 @@ interface Organization {
   name: string;
 }
 
-interface BusinessUnit {
+interface Team {
   id: string;
   name: string;
   organization_id: string;
 }
 
+interface FlowIdentifier {
+  key: string;
+}
 
 const props = withDefaults(defineProps<Props>(), {
   collection: '',
@@ -27,154 +32,147 @@ const props = withDefaults(defineProps<Props>(), {
 const { t } = useI18n();
 const api = useApi();
 const showDialog = ref(false);
-const currentBusinessUnit = ref<string>('');
 const organizations = ref<Organization[]>([]);
-const businessUnitsMap = ref<Map<string, BusinessUnit[]>>(new Map());
+const teamsMap = ref<Map<string, Team[]>>(new Map());
 const selectedOrganizationId = ref<string | null>(null);
 const isLoading = ref(false);
 
-const filteredBusinessUnits = computed(() => {
+// Get flow handling functionality
+const { runFlow } = useFlows();
+
+// Computed property for filtered teams based on selected organization
+const filteredTeams = computed(() => {
   if (!selectedOrganizationId.value) return [];
-  return businessUnitsMap.value.get(selectedOrganizationId.value) || [];
+  return teamsMap.value.get(selectedOrganizationId.value) || [];
 });
 
-const selectedBusinessUnitId = ref<string | null>(null);
+const selectedTeamId = ref<string | null>(null);
 
-const fetchBusinessUnits = async () => {
+const fetchTeams = async () => {
   try {
     isLoading.value = true;
     const response = await api.get('/users/me', {
       params: {
         fields: [
-          'business_unit_owner_id.id',
-          'business_unit_owner_id.name',
-          'business_unit_owner_id.organization_id.id',
-          'business_units_available.business_units_id.id',
-          'business_units_available.business_units_id.name',
-          'business_units_available.business_units_id.organization_id.id',
-          'business_units_available.business_units_id.organization_id.name'
+          'team.id',
+          'team.name',
+          'team.organization_id.id',
+          'team.organization_id.name',
+          'teams_available.teams_id.id',
+          'teams_available.teams_id.name',
+          'teams_available.teams_id.organization_id.id',
+          'teams_available.teams_id.organization_id.name'
         ]
       }
     });
 
     const data = response.data.data;
     
-    // Ensure we have the required data before proceeding
-    if (!data?.business_unit_owner_id) {
-      console.warn('Missing business unit data:', JSON.stringify(data, null, 2));
+    if (!data?.team) {
+      console.warn('Missing team data:', JSON.stringify(data, null, 2));
       return;
     }
 
-    // Set all reactive properties within a single tick
-    await nextTick(() => {
-      currentBusinessUnit.value = data.business_unit_owner_id.name;
-      const currentOrgId = data.business_unit_owner_id.organization_id.id;
-      const currentBUId = data.business_unit_owner_id.id;
-      
-      // Create maps
-      const orgsMap = new Map<string, Organization>();
-      const busMap = new Map<string, BusinessUnit[]>();
+    // Create maps
+    const orgsMap = new Map<string, Organization>();
+    const teamsByOrg = new Map<string, Map<string, Team>>();
 
-      // Filter out null values and map the data
-      data.business_units_available
-        .filter((item: any) => item.business_units_id !== null)
-        .forEach((item: any) => {
-          const bu = item.business_units_id;
-          const org = bu.organization_id;
+    // Add current user's organization and team first
+    const currentOrg = data.team.organization_id;
+    const currentTeam = {
+      id: data.team.id,
+      name: data.team.name,
+      organization_id: currentOrg.id
+    };
 
-          if (!orgsMap.has(org.id)) {
-            orgsMap.set(org.id, {
-              id: org.id,
-              name: org.name
-            });
-            busMap.set(org.id, []);
-          }
-
-          busMap.get(org.id)?.push({
-            id: bu.id,
-            name: bu.name,
-            organization_id: org.id
-          });
-        });
-
-      organizations.value = Array.from(orgsMap.values());
-      businessUnitsMap.value = busMap;
-      selectedOrganizationId.value = currentOrgId;
-      selectedBusinessUnitId.value = currentBUId;
+    orgsMap.set(currentOrg.id, {
+      id: currentOrg.id,
+      name: currentOrg.name
     });
+    teamsByOrg.set(currentOrg.id, new Map([[currentTeam.id, currentTeam]]));
+
+    // Process available teams
+    data.teams_available
+      .filter((item: any) => item.teams_id !== null)
+      .forEach((item: any) => {
+        const team = item.teams_id;
+        const org = team.organization_id;
+
+        // Add organization if not exists
+        if (!orgsMap.has(org.id)) {
+          orgsMap.set(org.id, {
+            id: org.id,
+            name: org.name
+          });
+          teamsByOrg.set(org.id, new Map());
+        }
+
+        // Add team to organization's team list
+        const teamsMap = teamsByOrg.get(org.id);
+        teamsMap?.set(team.id, {
+          id: team.id,
+          name: team.name,
+          organization_id: org.id
+        });
+      });
+
+    // Update reactive refs
+    organizations.value = Array.from(orgsMap.values());
+    teamsMap.value = new Map(
+      Array.from(teamsByOrg.entries()).map(([orgId, teamsMap]) => [orgId, Array.from(teamsMap.values())])
+    );
+    
+    // Set default selections in correct order
+    await nextTick();
+    selectedOrganizationId.value = currentOrg.id;
+    await nextTick();
+    selectedTeamId.value = currentTeam.id;
 
   } catch (error) {
-    console.error('Error fetching business units:', JSON.stringify(error, null, 2));
+    console.error('Error fetching teams:', JSON.stringify(error, null, 2));
   } finally {
     isLoading.value = false;
   }
 };
 
 const handleSave = async () => {
-  if (!selectedBusinessUnitId.value) return;
+  if (!selectedTeamId.value) return;
 
   try {
     isLoading.value = true;
     
-    // Update both the business_unit_owner_id and business_units_write
-    await api.patch('/users/me', {
-      business_unit_owner_id: selectedBusinessUnitId.value,
-      // Set business_units_write to only contain the selected business unit
-      business_units_write: [selectedBusinessUnitId.value]
+    // Call the flow and wait for completion
+    const { data } = await api.post(`/flows/trigger/83b4ee32-f5a0-4434-a8b3-ee4a8fe23f0d`, {
+      collection: 'teams',
+      keys: [selectedTeamId.value.toString()]
     });
 
-    // Call the callback if provided
-    if (props.onBusinessUnitChanged) {
-      await props.onBusinessUnitChanged();
-    }
-
+    // If we get here, flow completed successfully
     showDialog.value = false;
-    
-    // Show a loading overlay before reload
-    const loadingElement = document.createElement('div');
-    loadingElement.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: var(--theme--background);
-      z-index: 999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    `;
-    loadingElement.innerHTML = '<div class="v-progress-circular primary" style="width: 48px; height: 48px;"></div>';
-    document.body.appendChild(loadingElement);
-    
-    // Reload after a short delay
-    setTimeout(() => {
-      window.location.reload();
-    }, 300);
+    window.location.reload();
 
   } catch (error) {
-    console.error('Error updating business unit:', error);
+    console.error('Error switching team:', JSON.stringify(error, null, 2));
+    isLoading.value = false; // Reset loading state only on error
   }
 };
+
+// Watch for organization changes to reset team selection
+watch(selectedOrganizationId, (newValue) => {
+  // Only reset team selection if user changes the organization
+  if (newValue && selectedTeamId.value) {
+    const team = filteredTeams.value.find(team => team.id === selectedTeamId.value);
+    if (!team) {
+      selectedTeamId.value = null;
+    }
+  }
+});
 
 // Method that will be called from the parent
 const triggerAction = async () => {
-  // Reset state before showing dialog
-  selectedOrganizationId.value = null;
-  selectedBusinessUnitId.value = null;
-  organizations.value = [];
-  businessUnitsMap.value = new Map();
-  
   showDialog.value = true;
-  await fetchBusinessUnits();
+  await fetchTeams();
 };
-
-// Watch for organization changes and update business units loading state
-watch(selectedOrganizationId, (newValue) => {
-  if (newValue) {
-    selectedBusinessUnitId.value = null;
-  }
-});
 
 // Expose the method to the parent
 defineExpose({ triggerAction });
@@ -183,32 +181,29 @@ defineExpose({ triggerAction });
 <template>
   <v-dialog v-model="showDialog" @esc="showDialog = false">
     <v-card>
-      <v-card-title>{{ t('switch_business_unit') }}</v-card-title>
+      <v-card-title>{{ t('switch_team') }}</v-card-title>
       <v-card-text>
-        <v-text>
-          {{ t('switch_business_unit_description') }}
-        </v-text>
         <div class="field">
-          <div class="field-label">{{ t('organization') }}</div>
+          <div class="field-label">{{ t('organization',"Organization") }}</div>
           <v-select
             v-model="selectedOrganizationId"
             :items="organizations"
             item-value="id"
             item-text="name"
-            :placeholder="t('select_organization')"
+            :placeholder="t('select_organization', 'Select Organization')"
             :loading="isLoading"
             :disabled="isLoading"
           />
         </div>
 
         <div class="field">
-          <div class="field-label">{{ t('business_unit') }}</div>
+          <div class="field-label">{{ t('team', 'Team') }}</div>
           <v-select
-            v-model="selectedBusinessUnitId"
-            :items="filteredBusinessUnits"
+            v-model="selectedTeamId"
+            :items="filteredTeams"
             item-value="id"
             item-text="name"
-            :placeholder="t('select_business_unit')"
+            :placeholder="t('select_team', 'Select Team')"
             :disabled="!selectedOrganizationId || isLoading"
             :loading="isLoading"
           />
@@ -216,10 +211,10 @@ defineExpose({ triggerAction });
       </v-card-text>
       <v-card-actions>
         <v-button secondary @click="showDialog = false">
-          {{ t('cancel') }}
+          {{ t('cancel', 'Cancel') }}
         </v-button>
-        <v-button :disabled="!selectedBusinessUnitId" @click="handleSave">
-          {{ t('save') }}
+        <v-button :disabled="!selectedTeamId" @click="handleSave">
+          {{ t('save', 'Save') }}
         </v-button>
       </v-card-actions>
     </v-card>
