@@ -254,31 +254,6 @@ export default defineInterface({
 
 						// Add these fields for the generate_pdf action type
 						{
-							field: 'pdfField',
-							name: 'PDF Field',
-							type: 'string',
-							meta: {
-								width: 'full',
-								interface: 'system-field',
-								note: 'Select the field that contains/will contain the PDF file',
-								hidden: true, // Hide by default
-								options: {
-									collectionName: context.collection,
-									allowPrimaryKey: false,
-								},
-								conditions: [
-									{
-										rule: {
-											actionType: {
-												_eq: 'generate_pdf',
-											},
-										},
-										hidden: false, // Show only when actionType is generate_pdf
-									},
-								],
-							},
-						},
-						{
 							field: 'generatorFlow',
 							name: 'Generator Flow',
 							type: 'string',
