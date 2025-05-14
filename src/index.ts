@@ -261,6 +261,7 @@ export default defineInterface({
 								width: 'full',
 								interface: 'system-field',
 								note: 'Select the field that contains/will contain the PDF file',
+								hidden: true, // Hide by default
 								options: {
 									collectionName: context.collection,
 									allowPrimaryKey: false,
@@ -272,7 +273,7 @@ export default defineInterface({
 												_eq: 'generate_pdf',
 											},
 										},
-										hidden: false,
+										hidden: false, // Show only when actionType is generate_pdf
 									},
 								],
 							},
@@ -285,9 +286,11 @@ export default defineInterface({
 								width: 'full',
 								interface: 'collection-item-dropdown',
 								note: 'Select the Flow that will generate the PDF',
+								hidden: true,
 								options: {
-									collection: 'directus_flows',
-									template: '{{ name }}',
+									selectedCollection: 'directus_flows',
+									placeholder: 'Select a flow',
+									template: '{{ name }}'
 								},
 								conditions: [
 									{

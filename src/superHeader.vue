@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<SuperHeaderProps>(), {
 	
 });
 
+console.log('Super header V10')
 
 const api = useApi();
 const currentTeam = ref('');
