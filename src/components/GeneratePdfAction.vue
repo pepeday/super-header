@@ -27,7 +27,6 @@ const values = inject('values', ref<Record<string, any>>({}));
 const isLoading = ref(false);
 
 // Computed properties to safely access meta values
-const pdfField = computed(() => props.action.meta?.pdfField);
 const generatorFlow = computed(() => {
   const flow = props.action.meta?.generatorFlow;
   // If flow is an object with a key property, use that, otherwise use the flow value directly
@@ -129,13 +128,11 @@ const triggerAction = async () => {
     const existingFileId = await findExistingFile();
     
     if (existingFileId) {
-      console.log('Found existing file:', existingFileId);
       await downloadFile(existingFileId);
       return;
     }
 
     // No existing file found, trigger flow to generate one
-    console.log('No existing file found, triggering flow');
     await api.post(`/flows/trigger/${generatorFlow.value}`, {
       collection: collection.value,
       keys: [values.value.id.toString()]
