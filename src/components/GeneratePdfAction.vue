@@ -34,6 +34,7 @@ const generatorFlow = computed(() => {
   return typeof flow === 'object' && flow !== null ? flow.key : flow;
 });
 const collection = computed(() => props.action.collection);
+const fileRelationField = computed(() => props.action.meta?.fileRelationField);
 
 const getFileInfo = async (fileId: string): Promise<FileInfo | null> => {
   try {
@@ -80,13 +81,41 @@ const reloadItem = async () => {
   }
 };
 
+const findExistingFile = async (): Promise<string | null> => {
+  try {
+    if (!fileRelationField.value || !values.value.id) {
+      return null;
+    }
+
+    const response = await api.get('/files', {
+      params: {
+        filter: {
+          [fileRelationField.value]: {
+            _eq: values.value.id
+          }
+        },
+        limit: 1
+      }
+    });
+
+    if (response.data.data && response.data.data.length > 0) {
+      return response.data.data[0].id;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error finding existing file:', JSON.stringify(error, null, 2));
+    return null;
+  }
+};
+
 const triggerAction = async () => {
   if (isLoading.value) return;
   
   // Validate required fields
-  if (!pdfField.value || !generatorFlow.value || !collection.value) {
+  if (!fileRelationField.value || !generatorFlow.value || !collection.value) {
     console.error('Missing required configuration:', {
-      pdfField: pdfField.value,
+      fileRelationField: fileRelationField.value,
       generatorFlow: generatorFlow.value,
       collection: collection.value
     });
@@ -96,40 +125,33 @@ const triggerAction = async () => {
   isLoading.value = true;
 
   try {
-    // Check if PDF already exists
-    const currentPdfId = values.value[pdfField.value];
+    // Check for existing file
+    const existingFileId = await findExistingFile();
     
-    if (currentPdfId) {
-      await downloadFile(currentPdfId);
+    if (existingFileId) {
+      console.log('Found existing file:', existingFileId);
+      await downloadFile(existingFileId);
       return;
     }
 
-
-    // If no PDF exists, run the generator flow - following SwitchBU pattern exactly
-    const response = await api.post(`/flows/trigger/${generatorFlow.value}`, {
+    // No existing file found, trigger flow to generate one
+    console.log('No existing file found, triggering flow');
+    await api.post(`/flows/trigger/${generatorFlow.value}`, {
       collection: collection.value,
       keys: [values.value.id.toString()]
     });
 
-
-    // Add a small delay to allow the flow to complete
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Reload the item to get the updated PDF field
-    await reloadItem();
-    
-    // Get the new PDF file ID after reload
-    const newPdfId = values.value[pdfField.value];
-    
-    if (newPdfId) {
-      await downloadFile(newPdfId);
+    // Check for newly created file
+    const newFileId = await findExistingFile();
+    if (newFileId) {
+      console.log('New file generated:', newFileId);
+      await downloadFile(newFileId);
     } else {
-      throw new Error('Flow completed but no PDF was generated');
+      throw new Error('Flow completed but no file was generated');
     }
 
   } catch (error) {
-    console.error('Error in PDF generation/download:', JSON.stringify(error, null, 2));
-    // Add more detailed error logging with type checking
+    console.error('Error in PDF generation:', JSON.stringify(error, null, 2));
     if (error && typeof error === 'object' && 'response' in error) {
       const err = error as ErrorWithResponse;
       if (err.response) {

@@ -304,6 +304,38 @@ export default defineInterface({
 								],
 							},
 						},
+						{
+							field: 'fileRelationField',
+							name: 'File Relation Field',
+							type: 'string',
+							meta: {
+								width: 'full',
+								interface: 'system-field',
+								note: 'Select the field in directus_files that links to this item',
+								hidden: true,
+								options: {
+									collectionName: 'directus_files',
+									allowPrimaryKey: false,
+									allowNone: false,
+									template: '{{ field }}',
+									filter: {
+										type: {
+											_eq: 'alias'  // Only show M2O fields
+										}
+									}
+								},
+								conditions: [
+									{
+										rule: {
+											actionType: {
+												_eq: 'generate_pdf',
+											},
+										},
+										hidden: false,
+									},
+								],
+							},
+						},
 
 					],
 				},
