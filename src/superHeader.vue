@@ -7,6 +7,7 @@ import LinkAction from './components/LinkAction.vue';
 import FlowAction from './components/FlowAction.vue';
 import CreateAnywhere from './components/CreateAnywhere.vue';
 import SwitchBU from './components/SwitchBU.vue';
+import GeneratePdfAction from './components/GeneratePdfAction.vue';
 
 import type { SuperHeaderProps, Action, FlowIdentifier } from './types';
 import { useTranslation } from './composables/getTranslation';
@@ -28,16 +29,17 @@ const fetchCurrentTeam = async () => {
       params: {
         fields: [
           'team.name',
-		  'team.id'
+          'team.id'
         ]
       }
     });
     
     const team = response.data.data.team;
-    currentTeam.value = team.name;
+    currentTeam.value = team?.name || t('no_team', 'No Team');
 
   } catch (error) {
     console.error('Error fetching team:', JSON.stringify(error, null, 2));
+    currentTeam.value = t('no_team', 'No Team');
   }
 };
 
@@ -69,14 +71,13 @@ const toggleHelp = () => {
 
 const actionList = computed(() => {
 	const formattedActions = props.actions.map((action) => {
-		
 		const { actionType, label, icon, type, ...otherProps } = action;
 		const formattedAction = {
 			actionType,
 			label,
 			icon,
 			type,
-			collection: props.collection,
+			collection: action.collection || props.collection,
 			meta: {
 				...otherProps,
 			}
@@ -87,42 +88,60 @@ const actionList = computed(() => {
 });
 
 const emit = defineEmits(['action-clicked', 'action-triggered']);
-const handleActionClick = async (action: Action) => {
-    // Dynamically load the component for the action type
-    dynamicComponent.value = getComponentForAction(action.actionType);
-    
-    // Bind the action data
-    componentProps.value = {
-        ...action
-    };
 
-    // Wait for the next tick to ensure the component is mounted
-    await nextTick();
-    
-    // Call the child component's method
-    dynamicComponentRef.value?.triggerAction();
-    
-    // Emit the event
-    emit('action-triggered', action);
+// Change to a Map to track loading state per action type
+const actionLoadingStates = ref(new Map<string, boolean>());
+
+const handleActionClick = async (action: Action) => {
+	// Dynamically load the component for the action type
+	dynamicComponent.value = getComponentForAction(action.actionType);
+	
+	// Bind the action data with collection
+	componentProps.value = {
+		action: {
+			...action,
+			collection: action.collection || props.collection
+		}
+	};
+
+	// Wait for the next tick to ensure the component is mounted
+	await nextTick();
+	
+	// Set loading state for this specific action
+	actionLoadingStates.value.set(action.actionType, true);
+	
+	try {
+		// Call the child component's method
+		await dynamicComponentRef.value?.triggerAction();
+	} finally {
+		actionLoadingStates.value.set(action.actionType, false);
+	}
+	
+	// Emit the event
+	emit('action-triggered', action);
 };
 
-
-
+// Change from returning a computed to a direct function
+const isActionLoading = (actionType: string): boolean => {
+    return actionLoadingStates.value.get(actionType) ?? false;
+};
 
 const getComponentForAction = (actionType: string) => {
-    switch (actionType) {
-        case 'link':
-            return LinkAction; // Return the actual component, not a string
-        case 'flow':
-            return FlowAction;
-        case 'create_anywhere':
-            return CreateAnywhere;
-        case 'switch_bu':
-            return SwitchBU;
-        default:
-            console.warn(`Unknown action type: ${actionType}`);
-            return null;
-    }
+	switch (actionType) {
+		case 'link':
+			return LinkAction;
+		case 'flow':
+			return FlowAction;
+		case 'create_anywhere':
+			return CreateAnywhere;
+		case 'switch_bu':
+			return SwitchBU;
+		case 'generate_pdf':
+			return GeneratePdfAction;
+		default:
+			console.warn(`Unknown action type: ${actionType}`);
+			return null;
+	}
 };
 
 
@@ -151,24 +170,26 @@ const fields = computed(() => {
 });
 
 const handleSwitchTeam = async () => {
-    dynamicComponent.value = SwitchBU;
-    componentProps.value = {
-        collection: props.collection
-    };
-    
-    await nextTick();
-    dynamicComponentRef.value?.triggerAction();
-
+	dynamicComponent.value = SwitchBU;
+	componentProps.value = {
+		action: {
+			actionType: 'switch_bu',
+			collection: props.collection,
+			meta: {}
+		}
+	};
 	
+	await nextTick();
+	dynamicComponentRef.value?.triggerAction();
 };
 
 const copyCurrentUrl = () => {
-    navigator.clipboard.writeText(window.location.href);
-    notificationsStore.add({
-        title: t('Copied to clipboard'),
-        icon: 'content_copy',
-        type: 'success'
-    });
+	navigator.clipboard.writeText(window.location.href);
+	notificationsStore.add({
+		title: t('Copied to clipboard'),
+		icon: 'content_copy',
+		type: 'success'
+	});
 };
 
 </script>
@@ -215,8 +236,8 @@ const copyCurrentUrl = () => {
 					<v-button
 						:type="primaryAction.type"
 						small
+						:loading="isActionLoading(primaryAction.actionType)"
 						@click="handleActionClick(primaryAction)"
-
 					>
 						{{ primaryAction.label }}
 						<v-icon v-if="primaryAction.icon" :name="primaryAction.icon" right />
@@ -224,44 +245,19 @@ const copyCurrentUrl = () => {
 
 				</template>
 
-
-
-
-
-
-				<v-menu v-if="hasMultipleActions" placement="bottom-end">
-					<template #activator="{ toggle }">
-						<v-button small @click="toggle">
-							{{ props.actionButton }}
-							<v-icon name="expand_more" right />
-						</v-button>
-					</template>
-
-
-
-					<v-list>
-
-						<v-list-item
-							v-for="(action, index) in actionList"
-							:key="index"
-							clickable
-							@click="handleActionClick(action)"
-						>
-							<v-list-item-icon v-if="action.icon">
-								<v-icon :name="action.icon" />
-							</v-list-item-icon>
-							<v-list-item-content>
-								<v-list-item-title>
-
-										{{ action.label }}
-
-								</v-list-item-title>
-							</v-list-item-content>
-						</v-list-item>
-
-
-					</v-list>
-				</v-menu>
+				<template v-else-if="hasMultipleActions">
+					<v-button
+						v-for="action in actionList"
+						:key="action.actionType"
+						:type="action.type"
+						small
+						:loading="isActionLoading(action.actionType)"
+						@click="handleActionClick(action)"
+					>
+						{{ action.label }}
+						<v-icon v-if="action.icon" :name="action.icon" right />
+					</v-button>
+				</template>
 
 				<component
 				v-if="dynamicComponent"

@@ -14,7 +14,7 @@ export interface Action {
     label?: string; // The label to display for the action
     icon?: string; // An optional icon for the action
     type?: string; // Optional button or UI styling type
-	collection?: string;
+	collection: string; // Make collection required
 }
 
 export interface ActionComponent {

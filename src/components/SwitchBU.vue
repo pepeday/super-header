@@ -68,53 +68,52 @@ const fetchTeams = async () => {
 
     const data = response.data.data;
     
-    if (!data?.team) {
-      console.warn('Missing team data:', JSON.stringify(data, null, 2));
-      return;
-    }
-
     // Create maps
     const orgsMap = new Map<string, Organization>();
     const teamsByOrg = new Map<string, Map<string, Team>>();
 
-    // Add current user's organization and team first
-    const currentOrg = data.team.organization_id;
-    const currentTeam = {
-      id: data.team.id,
-      name: data.team.name,
-      organization_id: currentOrg.id
-    };
+    // If user has a current team, add it first
+    if (data?.team) {
+      const currentOrg = data.team.organization_id;
+      const currentTeam = {
+        id: data.team.id,
+        name: data.team.name,
+        organization_id: currentOrg.id
+      };
 
-    orgsMap.set(currentOrg.id, {
-      id: currentOrg.id,
-      name: currentOrg.name
-    });
-    teamsByOrg.set(currentOrg.id, new Map([[currentTeam.id, currentTeam]]));
+      orgsMap.set(currentOrg.id, {
+        id: currentOrg.id,
+        name: currentOrg.name
+      });
+      teamsByOrg.set(currentOrg.id, new Map([[currentTeam.id, currentTeam]]));
+    }
 
     // Process available teams
-    data.teams_available
-      .filter((item: any) => item.teams_id !== null)
-      .forEach((item: any) => {
-        const team = item.teams_id;
-        const org = team.organization_id;
+    if (data?.teams_available) {
+      data.teams_available
+        .filter((item: any) => item.teams_id !== null)
+        .forEach((item: any) => {
+          const team = item.teams_id;
+          const org = team.organization_id;
 
-        // Add organization if not exists
-        if (!orgsMap.has(org.id)) {
-          orgsMap.set(org.id, {
-            id: org.id,
-            name: org.name
+          // Add organization if not exists
+          if (!orgsMap.has(org.id)) {
+            orgsMap.set(org.id, {
+              id: org.id,
+              name: org.name
+            });
+            teamsByOrg.set(org.id, new Map());
+          }
+
+          // Add team to organization's team list
+          const teamsMap = teamsByOrg.get(org.id);
+          teamsMap?.set(team.id, {
+            id: team.id,
+            name: team.name,
+            organization_id: org.id
           });
-          teamsByOrg.set(org.id, new Map());
-        }
-
-        // Add team to organization's team list
-        const teamsMap = teamsByOrg.get(org.id);
-        teamsMap?.set(team.id, {
-          id: team.id,
-          name: team.name,
-          organization_id: org.id
         });
-      });
+    }
 
     // Update reactive refs
     organizations.value = Array.from(orgsMap.values());
@@ -122,11 +121,13 @@ const fetchTeams = async () => {
       Array.from(teamsByOrg.entries()).map(([orgId, teamsMap]) => [orgId, Array.from(teamsMap.values())])
     );
     
-    // Set default selections in correct order
-    await nextTick();
-    selectedOrganizationId.value = currentOrg.id;
-    await nextTick();
-    selectedTeamId.value = currentTeam.id;
+    // Set default selections if user has a current team
+    if (data?.team) {
+      await nextTick();
+      selectedOrganizationId.value = data.team.organization_id.id;
+      await nextTick();
+      selectedTeamId.value = data.team.id;
+    }
 
   } catch (error) {
     console.error('Error fetching teams:', JSON.stringify(error, null, 2));

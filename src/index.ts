@@ -52,12 +52,13 @@ export default defineInterface({
 
 		{
 			field: 'actions',
-			name: 'Actions',
+			name: '$t:actions',
 			type: 'json',
 			meta: {
+				width: 'full',
 				interface: 'list',
-				note: 'Add actions to the divider to help users navigate or run Flows.  If there are more than one action, actions will be displayed in a dropdown menu.',
 				options: {
+					template: '{{ label }}',
 					fields: [
 						{
 							field: 'label',
@@ -113,17 +114,14 @@ export default defineInterface({
 							meta: {
 								width: 'half',
 								interface: 'select-dropdown',
-								note: 'Select the action type.',
 								options: {
 									choices: [
 										{ text: 'Link', value: 'link' },
 										{ text: 'Flow', value: 'flow' },
-										{text: 'Create anywhere', value: 'create_anywhere'}
+										{ text: 'Create anywhere', value: 'create_anywhere' },
+										{ text: 'Generate PDF', value: 'generate_pdf' }
 									],
 								},
-							},
-							schema: {
-								default_value: 'link',
 							},
 						},
 						{
@@ -254,6 +252,55 @@ export default defineInterface({
 
 						// Create anywhere button end
 
+						// Add these fields for the generate_pdf action type
+						{
+							field: 'pdfField',
+							name: 'PDF Field',
+							type: 'string',
+							meta: {
+								width: 'full',
+								interface: 'system-field',
+								note: 'Select the field that contains/will contain the PDF file',
+								options: {
+									collectionName: context.collection,
+									allowPrimaryKey: false,
+								},
+								conditions: [
+									{
+										rule: {
+											actionType: {
+												_eq: 'generate_pdf',
+											},
+										},
+										hidden: false,
+									},
+								],
+							},
+						},
+						{
+							field: 'generatorFlow',
+							name: 'Generator Flow',
+							type: 'string',
+							meta: {
+								width: 'full',
+								interface: 'collection-item-dropdown',
+								note: 'Select the Flow that will generate the PDF',
+								options: {
+									collection: 'directus_flows',
+									template: '{{ name }}',
+								},
+								conditions: [
+									{
+										rule: {
+											actionType: {
+												_eq: 'generate_pdf',
+											},
+										},
+										hidden: false,
+									},
+								],
+							},
+						},
 
 					],
 				},
